@@ -4,11 +4,21 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.common.api.ApiException;
+import com.google.android.gms.tasks.Task;
 import com.nhn.android.naverlogin.OAuthLogin;
 import com.nhn.android.naverlogin.OAuthLoginHandler;
 import org.json.JSONException;
@@ -30,6 +40,11 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout googleLogin , kakaoLogin, naverLogin;
     private TextView googleLogout, kakaoLogout, naverLogout;
 
+    // Google Sign In API와 호출할 구글 로그인 클라이언트
+    GoogleSignInClient mGoogleSignInClient;
+    private final int RC_SIGN_IN = 123;
+    private static final String TAG = "MainActivity";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -43,6 +58,54 @@ public class MainActivity extends AppCompatActivity {
         kakaoLogout = findViewById(R.id.kakaoLogout);
         naverLogin = findViewById(R.id.naverLogin);
         naverLogout = findViewById(R.id.naverLogout);
+
+        // 구글 로그인
+        // 앱에 필요한 사용자 데이터를 요청하도록 로그인 옵션을 설정한다.
+        // DEFAULT_SIGN_IN parameter는 유저의 ID와 기본적인 프로필 정보를 요청하는데 사용된다.
+        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestEmail() // email addresses도 요청함
+                .build();
+        // 위에서 만든 GoogleSignInOptions을 사용해 GoogleSignInClient 객체를 만듬
+        mGoogleSignInClient = GoogleSignIn.getClient(MainActivity.this, gso);
+        // 기존에 로그인 했던 계정을 확인한다.
+        GoogleSignInAccount gsa = GoogleSignIn.getLastSignedInAccount(MainActivity.this);
+        // 로그인 되있는 경우 (토큰으로 로그인 처리)
+        if (gsa != null && gsa.getId() != null) {
+
+        }
+
+        googleLogin.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                signIn();
+            }
+        });
+
+        googleLogout.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                AlertDialog.Builder logoutDialog = new AlertDialog.Builder(MainActivity.this);
+                logoutDialog.setTitle("알림");
+                logoutDialog.setMessage("로그아웃 하시겠습니까?");
+                logoutDialog.setNegativeButton(" 취소", null);
+                logoutDialog.setPositiveButton("확인", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int i) {
+                        mGoogleSignInClient.signOut()
+                                .addOnCompleteListener(MainActivity.this, task -> {
+                                    Log.d(TAG, "onClick:logout success ");
+                                    mGoogleSignInClient.revokeAccess()
+                                            .addOnCompleteListener(MainActivity.this, task1 -> Log.d(TAG, "onClick:revokeAccess success "));
+                                });
+                        googleLogout.setVisibility(View.INVISIBLE);
+                        googleLogout.setEnabled(false);
+                        Toast.makeText(getApplicationContext(), "구글 로그아웃되었습니다." ,Toast.LENGTH_SHORT).show();
+                    }
+                });
+                logoutDialog.show();
+            }
+        });
+
         // 네이버 로그인
         naverLogin.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -85,7 +148,6 @@ public class MainActivity extends AppCompatActivity {
                             String errorDesc = oAuthLogin.getLastErrorDesc(context);
 //                            Toast.makeText(context, "errorCode:" + errorCode
 //                                    + ", errorDesc:" + errorDesc, Toast.LENGTH_SHORT).show();
-                            Toast.makeText(MainActivity.this, "로그인 오류가 발생했습니다.", Toast.LENGTH_SHORT).show();
                         }
                     }
                 };
@@ -114,8 +176,58 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
-    // 유저 정보 가져오기
-    private void naverUserInfo(String msg){
+    // 구글
+    private void signIn() {
+        Intent signInIntent = mGoogleSignInClient.getSignInIntent();
+        startActivityForResult(signInIntent, RC_SIGN_IN);
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        // Result returned from launching the Intent from GoogleSignInClient.getSignInIntent(...);
+        if (requestCode == RC_SIGN_IN) {
+            // The Task returned from this call is always completed, no need to attach
+            // a listener.
+            Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
+            handleSignInResult(task);
+        }
+    }
+
+    private void handleSignInResult(Task<GoogleSignInAccount> completedTask) {
+        try {
+            GoogleSignInAccount acct = completedTask.getResult(ApiException.class);
+
+            if (acct != null) {
+                String personName = acct.getDisplayName();
+                String personGivenName = acct.getGivenName();
+                String personFamilyName = acct.getFamilyName();
+                String personEmail = acct.getEmail();
+                String personId = acct.getId();
+                Uri personPhoto = acct.getPhotoUrl();
+
+                Log.d(TAG, "handleSignInResult:personName "+personName);
+                Log.d(TAG, "handleSignInResult:personGivenName "+personGivenName);
+                Log.d(TAG, "handleSignInResult:personEmail "+personEmail);
+                Log.d(TAG, "handleSignInResult:personId "+personId);
+                Log.d(TAG, "handleSignInResult:personFamilyName "+personFamilyName);
+                Log.d(TAG, "handleSignInResult:personPhoto "+personPhoto);
+                googleLogout.setVisibility(View.VISIBLE);
+                googleLogout.setEnabled(true);
+                Toast.makeText(getApplicationContext(), "이름 : " + personName + "\n" + "이메일 : " + personEmail ,Toast.LENGTH_SHORT).show();
+            }
+        } catch (ApiException e) {
+            // The ApiException status code indicates the detailed failure reason.
+            // Please refer to the GoogleSignInStatusCodes class reference for more information.
+            Log.e(TAG, "signInResult:failed code=" + e.getStatusCode());
+
+        }
+    }
+    // 카카오
+
+    // 네이버
+    private void naverUserInfo(String msg){ // 유저 정보 가져오기
 
         try {
             JSONObject userInfo = new JSONObject(msg);
@@ -194,5 +306,19 @@ public class MainActivity extends AppCompatActivity {
         } catch (IOException e) {
             throw new RuntimeException("API 응답을 읽는데 실패했습니다.", e);
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // 구글 로그아웃
+        mGoogleSignInClient.signOut()
+                .addOnCompleteListener(MainActivity.this, task -> {
+                    Log.d(TAG, "onClick:logout success ");
+                    mGoogleSignInClient.revokeAccess()
+                            .addOnCompleteListener(MainActivity.this, task1 -> Log.d(TAG, "onClick:revokeAccess success "));
+                });
+        // 네이버 로그아웃
+        oAuthLogin.logout(context);
     }
 }

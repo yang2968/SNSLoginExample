@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "528350767078",
+    "project_id": "snsloginexample-81f27",
+    "storage_bucket": "snsloginexample-81f27.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:528350767078:android:7c9cc55054ad3d64e2d827",
+        "android_client_info": {
+          "package_name": "com.example.snsloginexample"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "528350767078-t6585gnbv74rtm23mkomp6uot9urrhb6.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA0VxRkIuhYJid1McxhGsPh0QVvCfHhTt4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "528350767078-t6585gnbv74rtm23mkomp6uot9urrhb6.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
