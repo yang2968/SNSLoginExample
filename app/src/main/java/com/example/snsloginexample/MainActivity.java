@@ -5,20 +5,30 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.Signature;
 import android.net.Uri;
 import android.os.Bundle;
+import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.example.snsloginexample.KAKAO.SessionCallback;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
-import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.tasks.Task;
+import com.kakao.auth.AuthType;
+import com.kakao.auth.Session;
+import com.kakao.sdk.user.UserApiClient;
+import com.kakao.usermgmt.UserManagement;
+import com.kakao.usermgmt.callback.LogoutResponseCallback;
 import com.nhn.android.naverlogin.OAuthLogin;
 import com.nhn.android.naverlogin.OAuthLoginHandler;
 import org.json.JSONException;
@@ -30,27 +40,35 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
 
+    public static Context context;
     private OAuthLogin oAuthLogin;
-    private Context context;
     private LinearLayout googleLogin , kakaoLogin, naverLogin;
-    private TextView googleLogout, kakaoLogout, naverLogout;
+    private static TextView googleLogout, kakaoLogout, naverLogout;
 
     // Google Sign In API와 호출할 구글 로그인 클라이언트
-    GoogleSignInClient mGoogleSignInClient;
+    private GoogleSignInClient mGoogleSignInClient;
     private final int RC_SIGN_IN = 123;
     private static final String TAG = "MainActivity";
+
+    // 카카오
+    private Session session;
+    private SessionCallback sessionCallback = new SessionCallback();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        context = getApplicationContext();
+        getHashKey();
+
+        context = this;
 
         googleLogin = findViewById(R.id.googleLogin);
         googleLogout = findViewById(R.id.googleLogout);
@@ -58,8 +76,6 @@ public class MainActivity extends AppCompatActivity {
         kakaoLogout = findViewById(R.id.kakaoLogout);
         naverLogin = findViewById(R.id.naverLogin);
         naverLogout = findViewById(R.id.naverLogout);
-
-        // 구글 로그인
         // 앱에 필요한 사용자 데이터를 요청하도록 로그인 옵션을 설정한다.
         // DEFAULT_SIGN_IN parameter는 유저의 ID와 기본적인 프로필 정보를 요청하는데 사용된다.
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -71,16 +87,18 @@ public class MainActivity extends AppCompatActivity {
         GoogleSignInAccount gsa = GoogleSignIn.getLastSignedInAccount(MainActivity.this);
         // 로그인 되있는 경우 (토큰으로 로그인 처리)
         if (gsa != null && gsa.getId() != null) {
-
         }
 
+        // 카카오
+        session = Session.getCurrentSession();
+        session.addCallback(sessionCallback);
+        // 구글 로그인
         googleLogin.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 signIn();
             }
         });
-
         googleLogout.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -99,7 +117,45 @@ public class MainActivity extends AppCompatActivity {
                                 });
                         googleLogout.setVisibility(View.INVISIBLE);
                         googleLogout.setEnabled(false);
-                        Toast.makeText(getApplicationContext(), "구글 로그아웃되었습니다." ,Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getApplicationContext(), "구글 로그아웃", Toast.LENGTH_SHORT).show();
+                    }
+                });
+                logoutDialog.show();
+            }
+        });
+
+        // 카카오 로그인
+        kakaoLogin.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                session.open(AuthType.KAKAO_LOGIN_ALL, MainActivity.this);
+            }
+        });
+
+        kakaoLogout.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                AlertDialog.Builder logoutDialog = new AlertDialog.Builder(MainActivity.this);
+                logoutDialog.setTitle("알림");
+                logoutDialog.setMessage("로그아웃 하시겠습니까?");
+                logoutDialog.setNegativeButton(" 취소", null);
+                logoutDialog.setPositiveButton("확인", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int i) {
+                        UserManagement.getInstance()
+                                .requestLogout(new LogoutResponseCallback() {
+                                    @Override
+                                    public void onCompleteLogout() {
+                                        runOnUiThread(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                kakaoLogout.setVisibility(View.INVISIBLE);
+                                                kakaoLogout.setEnabled(false);
+                                                Toast.makeText(MainActivity.this, "카카오 로그아웃", Toast.LENGTH_SHORT).show();
+                                            }
+                                        });
+                                    }
+                                });
                     }
                 });
                 logoutDialog.show();
@@ -169,7 +225,7 @@ public class MainActivity extends AppCompatActivity {
                             oAuthLogin.logout(context);
                             naverLogout.setVisibility(View.INVISIBLE);
                             naverLogout.setEnabled(false);
-                            Toast.makeText(MainActivity.this, "네이버 로그아웃 되었습니다.", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(MainActivity.this, "네이버 로그아웃", Toast.LENGTH_SHORT).show();
                         }
                     });
                     logoutDialog.show();
@@ -184,6 +240,10 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        // 카카오톡|스토리 간편로그인 실행 결과를 받아서 SDK로 전달
+        if (Session.getCurrentSession().handleActivityResult(requestCode, resultCode, data)) {
+            return;
+        }
         super.onActivityResult(requestCode, resultCode, data);
 
         // Result returned from launching the Intent from GoogleSignInClient.getSignInIntent(...);
@@ -215,7 +275,8 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "handleSignInResult:personPhoto "+personPhoto);
                 googleLogout.setVisibility(View.VISIBLE);
                 googleLogout.setEnabled(true);
-                Toast.makeText(getApplicationContext(), "이름 : " + personName + "\n" + "이메일 : " + personEmail ,Toast.LENGTH_SHORT).show();
+                //Toast.makeText(getApplicationContext(), "이름 : " + personName + "\n" + "이메일 : " + personEmail ,Toast.LENGTH_SHORT).show();
+                Toast.makeText(getApplicationContext(), "구글 로그인 성공", Toast.LENGTH_SHORT).show();
             }
         } catch (ApiException e) {
             // The ApiException status code indicates the detailed failure reason.
@@ -225,6 +286,11 @@ public class MainActivity extends AppCompatActivity {
         }
     }
     // 카카오
+    public void showKakaoLogout() {
+            kakaoLogout.setVisibility(View.VISIBLE);
+            kakaoLogout.setEnabled(true);
+    }
+
 
     // 네이버
     private void naverUserInfo(String msg){ // 유저 정보 가져오기
@@ -247,7 +313,8 @@ public class MainActivity extends AppCompatActivity {
                     public void run() {
                         naverLogout.setVisibility(View.VISIBLE);
                         naverLogout.setEnabled(true);
-                        Toast.makeText(getApplicationContext(), "이름 : " + userName + "\n" + "전화번호 : " + mobile + "\n" + "이메일 : " + email ,Toast.LENGTH_SHORT).show();
+//                        Toast.makeText(getApplicationContext(), "이름 : " + userName + "\n" + "전화번호 : " + mobile + "\n" + "이메일 : " + email ,Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getApplicationContext(), "네이버 로그인 성공", Toast.LENGTH_SHORT).show();
                     }
                 });
             } else {
@@ -308,6 +375,27 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void getHashKey(){
+        PackageInfo packageInfo = null;
+        try {
+            packageInfo = getPackageManager().getPackageInfo(getPackageName(), PackageManager.GET_SIGNATURES);
+        } catch (PackageManager.NameNotFoundException e) {
+            e.printStackTrace();
+        }
+        if (packageInfo == null)
+            Log.e("KeyHash", "KeyHash:null");
+
+        for (Signature signature : packageInfo.signatures) {
+            try {
+                MessageDigest md = MessageDigest.getInstance("SHA");
+                md.update(signature.toByteArray());
+                Log.d("KeyHash", Base64.encodeToString(md.digest(), Base64.DEFAULT));
+            } catch (NoSuchAlgorithmException e) {
+                Log.e("KeyHash", "Unable to get MessageDigest. signature=" + signature, e);
+            }
+        }
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
@@ -318,6 +406,9 @@ public class MainActivity extends AppCompatActivity {
                     mGoogleSignInClient.revokeAccess()
                             .addOnCompleteListener(MainActivity.this, task1 -> Log.d(TAG, "onClick:revokeAccess success "));
                 });
+        // 카카오 로그아웃
+        // 세션 콜백 삭제
+        Session.getCurrentSession().removeCallback(sessionCallback);
         // 네이버 로그아웃
         oAuthLogin.logout(context);
     }

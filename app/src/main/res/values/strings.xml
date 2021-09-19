@@ -3,5 +3,5 @@
     <string name="naver_client_id">SaZiplR5kAEJS2aSvbTr</string>
     <string name="naver_client_secret">uWcnJpfZ9k</string>
     <string name="naver_client_name">SNSLoginExample</string>
-    <string name="google_client_id">528350767078-t6585gnbv74rtm23mkomp6uot9urrhb6.apps.googleusercontent.com</string>
+    <string name="kakao_native_app_key">422e0aa964134d3e606dbe5e1206cef0</string>
 </resources>
